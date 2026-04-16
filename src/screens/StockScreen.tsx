@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { parseProductExcel } from '../services/excelProductParser';
+import { downloadProductFormat } from '../services/exportService';
 
 // ─── Modal Produk Baru ────────────────────────────
 // DIPERBAIKI: Memisahkan komponen modal agar re-render tidak mengganggu focus keyboard
@@ -140,6 +141,10 @@ export default function StockScreen() {
           <TouchableOpacity onPress={handleImport} disabled={isImporting}
             className="w-12 h-12 bg-slate-800 border border-slate-700 rounded-2xl items-center justify-center">
             {isImporting ? <ActivityIndicator size="small" color="#8b5cf6" /> : <Ionicons name="cloud-upload-outline" size={20} color="#8b5cf6" />}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={downloadProductFormat}
+            className="w-12 h-12 bg-slate-800 border border-slate-700 rounded-2xl items-center justify-center">
+            <Ionicons name="download-outline" size={20} color="#3b82f6" />
           </TouchableOpacity>
         </View>
       </View>

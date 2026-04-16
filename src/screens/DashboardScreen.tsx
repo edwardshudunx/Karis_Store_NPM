@@ -75,17 +75,17 @@ export default function DashboardScreen() {
     { label: 'Nilai Aset\nStok', value: formatRupiah(asetStok), icon: 'cube', color: '#8b5cf6' },
   ];
 
-  const shopeeOmzet = store.omsetRecords
+  const shopeeOmzet = (store.transactions || [])
     .filter(r => r.platform === 'Shopee')
-    .reduce((s, r) => s + r.totalHarga, 0);
+    .reduce((s, r) => s + (r.totalAmount || 0), 0);
 
-  const tiktokOmzet = store.omsetRecords
+  const tiktokOmzet = (store.transactions || [])
     .filter(r => r.platform === 'TikTok Shop')
-    .reduce((s, r) => s + r.totalHarga, 0);
+    .reduce((s, r) => s + (r.totalAmount || 0), 0);
 
-  const offlineOmzet = store.transactions
+  const offlineOmzet = (store.transactions || [])
     .filter(t => t.type === 'offline')
-    .reduce((s, r) => s + r.totalAmount, 0);
+    .reduce((s, r) => s + (r.totalAmount || 0), 0);
 
   const bars = [
     { label: 'Shopee',  value: shopeeOmzet,  color: '#f97316' },

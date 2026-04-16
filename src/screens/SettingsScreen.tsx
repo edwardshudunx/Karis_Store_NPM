@@ -25,6 +25,7 @@ export default function SettingsScreen() {
   const [newRekName, setNewRekName] = useState('');
   
   const [transfer, setTransfer] = useState({ from: 0, to: 0, amount: '' });
+  const [editSaldo, setEditSaldo] = useState<{ id: number; name: string; amount: string } | null>(null);
 
   const handleReset = () => {
     Alert.alert('Konfirmasi Reset', 'Semua data akan dihapus permanen. Lanjutkan?', [
@@ -75,8 +76,15 @@ export default function SettingsScreen() {
       <View className="bg-slate-800/50 border border-slate-700/50 rounded-3xl p-4 mb-4">
         {rekenings.map(r => (
           <View key={r.id} className="flex-row items-center justify-between py-2 border-b border-slate-700/30 last:border-0">
-             <Text className="text-slate-300 font-medium">{r.name}</Text>
-             <Text className="text-white font-bold">{formatRupiah(r.balance)}</Text>
+             <View className="flex-1">
+                <Text className="text-slate-300 font-medium">{r.name}</Text>
+             </View>
+             <View className="flex-row items-center">
+                <Text className="text-white font-bold mr-3">{formatRupiah(r.balance)}</Text>
+                <TouchableOpacity onPress={() => setEditSaldo({ id: r.id, name: r.name, amount: String(r.balance) })} className="p-1.5 bg-slate-700 rounded-lg">
+                   <Ionicons name="create-outline" size={14} color="#94a3b8" />
+                </TouchableOpacity>
+             </View>
           </View>
         ))}
         <View className="flex-row gap-2 mt-4">
@@ -134,6 +142,39 @@ export default function SettingsScreen() {
 
                <TouchableOpacity onPress={handleTransfer} className="bg-blue-500 rounded-2xl py-4 items-center mb-2"><Text className="text-white font-bold text-lg">Konfirmasi Pindahkan Dana</Text></TouchableOpacity>
                <TouchableOpacity onPress={() => setShowTransferModal(false)} className="py-2 items-center"><Text className="text-slate-500">Batalkan</Text></TouchableOpacity>
+            </View>
+         </View>
+      </Modal>
+
+      {/* Modal Edit Saldo Manual */}
+      <Modal visible={!!editSaldo} transparent animationType="fade" onRequestClose={() => setEditSaldo(null)}>
+         <View className="flex-1 bg-black/70 justify-center p-6">
+            <View className="bg-slate-800 rounded-3xl p-6 border border-slate-700">
+               <Text className="text-white text-lg font-bold mb-1">Edit Saldo Manual</Text>
+               <Text className="text-slate-500 text-xs mb-4">{editSaldo?.name}</Text>
+               
+               <Text className="text-slate-400 text-[10px] font-bold uppercase mb-2">Total Saldo Baru (Rp):</Text>
+               <TextInput 
+                  className="bg-slate-700 text-white rounded-xl px-4 py-3 mb-5 font-bold text-lg" 
+                  keyboardType="numeric"
+                  value={editSaldo?.amount} 
+                  onChangeText={t => setEditSaldo(prev => prev ? {...prev, amount: t} : null)} 
+               />
+
+               <View className="flex-row gap-3">
+                  <TouchableOpacity onPress={() => setEditSaldo(null)} className="flex-1 py-3 items-center"><Text className="text-slate-400">Batal</Text></TouchableOpacity>
+                  <TouchableOpacity 
+                    onPress={() => {
+                        if (editSaldo) {
+                           store.updateRekeningBalance(editSaldo.id, parseFloat(editSaldo.amount) || 0);
+                           setEditSaldo(null);
+                        }
+                    }} 
+                    className="flex-1 bg-blue-500 rounded-xl py-3 items-center"
+                  >
+                     <Text className="text-white font-bold">Update Saldo</Text>
+                  </TouchableOpacity>
+               </View>
             </View>
          </View>
       </Modal>

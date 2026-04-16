@@ -57,6 +57,7 @@ type AppState = {
   cashFlows: CashFlowEntry[];
   transactions: Transaction[];
   rekenings: Rekening[];
+  omsetRecords: any[]; // Data from omset_records table
 
   loadAll: () => void;
 
@@ -71,11 +72,12 @@ type AppState = {
 
   // Rekening
   addRekening: (name: string) => void;
+  updateRekeningBalance: (id: number, balance: number) => void;
   transferFunds: (fromId: number, toId: number, amount: number) => void;
 
   // Transactions
   addTransaction: (t: Omit<Transaction, 'id' | 'items'>, items: Omit<TransactionItem, 'id' | 'transactionId' | 'unit'>[], rekeningId?: number) => void;
-  processReturn: (originalTxId: number, returnItems: { productId: number; productName: string; qty: number; price: number }[], rekeningId?: number) => void;
+  processReturn: (originalTxId: number, returnItems: { productId: number; productName: string; qty: number; price: number; shouldRestock: boolean }[], rekeningId?: number) => void;
   settleBill: (orderId: number, rekeningId: number) => void; 
 
   // Computed
@@ -92,23 +94,33 @@ export const useAppStore = create<AppState>((set, get) => ({
   cashFlows: [],
   transactions: [],
   rekenings: [],
+  omsetRecords: [],
 
   loadAll: () => {
     try {
-      const products = db.getAllSync('SELECT * FROM products ORDER BY name') as Product[];
-      const cashFlows = db.getAllSync('SELECT * FROM cash_flow ORDER BY date DESC') as CashFlowEntry[];
-      const rekenings = db.getAllSync('SELECT * FROM rekening') as Rekening[];
-      const txs = db.getAllSync('SELECT * FROM transactions ORDER BY date DESC') as Transaction[];
-      const allItems = db.getAllSync('SELECT * FROM transaction_items') as TransactionItem[];
+      console.log('🔄 Loading all data...');
+      const products = (db.getAllSync('SELECT * FROM products ORDER BY name') || []) as Product[];
+      const cashFlows = (db.getAllSync('SELECT * FROM cash_flow ORDER BY date DESC') || []) as CashFlowEntry[];
+      const rekenings = (db.getAllSync('SELECT * FROM rekening') || []) as Rekening[];
+      const txs = (db.getAllSync('SELECT * FROM transactions ORDER BY date DESC') || []) as Transaction[];
+      const allItems = (db.getAllSync('SELECT * FROM transaction_items') || []) as TransactionItem[];
+      const omsetRecords = (db.getAllSync('SELECT * FROM omset_records ORDER BY date DESC') || []) as any[];
       
-      const transactions = txs.map(t => ({
+      const transactions = (txs || []).map(t => ({
         ...t,
-        items: allItems.filter(i => i.transactionId === t.id)
+        items: (allItems || []).filter(i => i.transactionId === t.id)
       }));
 
-      set({ products, cashFlows, transactions, rekenings });
+      set({ 
+        products: products || [], 
+        cashFlows: cashFlows || [], 
+        transactions: transactions || [], 
+        rekenings: rekenings || [],
+        omsetRecords: omsetRecords || []
+      });
+      console.log('✅ Data loaded successfully');
     } catch (e) {
-      console.error('loadAll error', e);
+      console.error('❌ loadAll error', e);
     }
   },
 
@@ -143,6 +155,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   addRekening: (name) => {
     db.runSync('INSERT INTO rekening (name, balance) VALUES (?, ?)', [name, 0]);
+    get().loadAll();
+  },
+
+  updateRekeningBalance: (id, balance) => {
+    db.runSync('UPDATE rekening SET balance = ? WHERE id = ?', [balance, id]);
     get().loadAll();
   },
 
@@ -225,7 +242,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         for (const item of returnItems) {
           const prod = get().products.find(p => p.id === item.productId);
           stmt.executeSync([retId, item.productId, item.productName, prod?.unit || 'pcs', item.qty, item.price]);
-          get().updateStock(item.productId, item.qty);
+          if (item.shouldRestock) {
+             get().updateStock(item.productId, item.qty);
+          }
         }
       } finally { stmt.finalizeSync(); }
 

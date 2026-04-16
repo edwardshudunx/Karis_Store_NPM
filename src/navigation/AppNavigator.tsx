@@ -9,6 +9,7 @@ import StockScreen        from '../screens/StockScreen';
 import OfflineSalesScreen from '../screens/OfflineSalesScreen';
 import UploadOmsetScreen  from '../screens/UploadOmsetScreen';
 import SettingsScreen     from '../screens/SettingsScreen';
+import ReportScreen       from '../screens/ReportScreen';
 
 const Drawer = createDrawerNavigator();
 
@@ -56,6 +57,7 @@ export default function AppNavigator() {
         'Arus Kas': 'wallet',
         'Stok Gudang': 'cube',
         'Upload Omset': 'cloud-upload',
+        Laporan: 'bar-chart',
         'Pengaturan': 'settings',
       };
       return <Ionicons name={(icons[route.name] ?? 'ellipse') as any} size={size} color={color} />;
@@ -72,6 +74,7 @@ export default function AppNavigator() {
       <Drawer.Screen name="Arus Kas"          component={CashFlowScreen} />
       <Drawer.Screen name="Stok Gudang"       component={StockScreen} />
       <Drawer.Screen name="Upload Omset"      component={UploadOmsetScreen} />
+      <Drawer.Screen name="Laporan"           component={ReportScreen} />
       <Drawer.Screen name="Pengaturan"        component={SettingsScreen} />
     </Drawer.Navigator>
   );

@@ -151,9 +151,15 @@ const DetailModal = ({ visible, tx, onClose, setIsSettling, setShowRetur }: { vi
             <TouchableOpacity onPress={() => { setIsSettling(true); setShowRetur(true); }} className="bg-emerald-500 rounded-2xl py-4 flex-row items-center justify-center mb-3"><Ionicons name="cash" size={18} color="white" /><Text className="text-white font-bold ml-2">Lunasi Tagihan Net</Text></TouchableOpacity>
           )}
           {tx?.status === 'lunas' && (
-            <TouchableOpacity onPress={() => generateSettlementPDF(tx, relatedReturns)} className="bg-emerald-600 rounded-xl py-4 flex-row items-center justify-center mb-3"><Ionicons name="document-text-outline" size={18} color="white" /><Text className="text-white font-bold ml-2">Cetak Kwitansi</Text></TouchableOpacity>
+            <View className="flex-row gap-2 mb-3">
+              <TouchableOpacity onPress={() => generateSettlementPDF(tx, relatedReturns, 'print')} className="flex-1 bg-emerald-600 rounded-xl py-3.5 flex-row items-center justify-center"><Ionicons name="print" size={16} color="white" /><Text className="text-white font-bold text-xs ml-2">Cetak Kwitansi</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => generateSettlementPDF(tx, relatedReturns, 'share')} className="flex-1 bg-slate-700 rounded-xl py-3.5 flex-row items-center justify-center border border-emerald-500/30"><Ionicons name="share-social" size={16} color="#10b981" /><Text className="text-emerald-400 font-bold text-xs ml-2">Bagikan</Text></TouchableOpacity>
+            </View>
           )}
-          <TouchableOpacity onPress={() => tx && generateInvoicePDF(tx)} className="bg-slate-700 rounded-xl py-3.5 flex-row items-center justify-center mb-3"><Ionicons name="print-outline" size={18} color="white" /><Text className="text-white font-bold ml-2">Cetak Surat Pesanan</Text></TouchableOpacity>
+          <View className="flex-row gap-2 mb-3">
+            <TouchableOpacity onPress={() => tx && generateInvoicePDF(tx, relatedReturns, 'print')} className="flex-1 bg-slate-700 rounded-xl py-3.5 flex-row items-center justify-center border border-slate-600"><Ionicons name="print-outline" size={16} color="white" /><Text className="text-white font-bold text-xs ml-2">Cetak SP</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => tx && generateInvoicePDF(tx, relatedReturns, 'share')} className="flex-1 bg-slate-700 rounded-xl py-3.5 flex-row items-center justify-center border border-blue-500/30"><Ionicons name="share-outline" size={16} color="#3b82f6" /><Text className="text-blue-400 font-bold text-xs ml-2">Bagikan SP</Text></TouchableOpacity>
+          </View>
           <TouchableOpacity onPress={onClose} className="mt-2 py-2 items-center"><Text className="text-slate-500">Tutup</Text></TouchableOpacity>
       </View></View>
     </Modal>
@@ -163,7 +169,7 @@ const DetailModal = ({ visible, tx, onClose, setIsSettling, setShowRetur }: { vi
 // ─── Modal Retur (Unified with Settlement) ───
 const ReturnModal = ({ visible, tx, isSettling, setIsSettling, onClose }: { visible: boolean; tx: Transaction | null; isSettling: boolean; setIsSettling: (v: boolean) => void; onClose: () => void }) => {
   const store = useAppStore();
-  const [retItems, setRetItems] = useState<{ productId: number; productName: string; qty: number; price: number; max: number }[]>([]);
+  const [retItems, setRetItems] = useState<{ productId: number; productName: string; qty: number; price: number; max: number; shouldRestock: boolean }[]>([]);
   const [rekeningId, setRekeningId] = useState(1);
 
   useEffect(() => {
@@ -171,9 +177,9 @@ const ReturnModal = ({ visible, tx, isSettling, setIsSettling, onClose }: { visi
       const grouped = tx.items.reduce((acc, item) => {
         const existing = acc.find(i => i.productId === item.productId);
         if (existing) existing.max += item.quantity;
-        else acc.push({ productId: item.productId, productName: item.productName, qty: 0, price: item.price, max: item.quantity });
+        else acc.push({ productId: item.productId, productName: item.productName, qty: 0, price: item.price, max: item.quantity, shouldRestock: true });
         return acc;
-      }, [] as { productId: number; productName: string; qty: number; price: number; max: number }[]);
+      }, [] as { productId: number; productName: string; qty: number; price: number; max: number; shouldRestock: boolean }[]);
       setRetItems(grouped);
     }
   }, [tx]);
@@ -201,12 +207,23 @@ const ReturnModal = ({ visible, tx, isSettling, setIsSettling, onClose }: { visi
         <Text className="text-red-400 text-xl font-bold mb-1">{isSettling ? '💰 Pelunasan & Retur' : '↩️ Pilih Retur'}</Text>
         <ScrollView className="flex-1 mb-5">
            {retItems.map((item, idx) => (
-                <View key={`ret-${item.productId}-${idx}`} className="flex-row items-center bg-slate-900/50 p-3 mb-2 rounded-xl">
-                  <Text className="flex-1 text-slate-300 text-xs">{item.productName}</Text>
-                  <View className="flex-row items-center">
-                    <TouchableOpacity onPress={() => setRetItems(retItems.map(i => i.productId === item.productId ? { ...i, qty: Math.max(0, i.qty - 1) } : i))}><Ionicons name="remove-circle" size={24} color="#ef4444" /></TouchableOpacity>
-                    <TextInput className="text-white font-bold mx-3 w-8 text-center" keyboardType="numeric" value={String(item.qty)} onChangeText={(v) => { const n = parseInt(v.replace(/[^0-9]/g, '')) || 0; setRetItems(retItems.map(i => i.productId === item.productId ? { ...i, qty: Math.min(i.max, Math.max(0, n)) } : i)); }} />
-                    <TouchableOpacity onPress={() => setRetItems(retItems.map(i => i.productId === item.productId ? { ...i, qty: Math.min(item.max, item.qty + 1) } : i))}><Ionicons name="add-circle" size={24} color="#10b981" /></TouchableOpacity>
+                <View key={`ret-${item.productId}-${idx}`} className="bg-slate-900/50 p-4 mb-3 rounded-2xl border border-slate-700/50">
+                  <View className="flex-row items-center justify-between mb-3">
+                    <Text className="flex-1 text-slate-300 text-xs font-bold uppercase">{item.productName}</Text>
+                    <TouchableOpacity 
+                      onPress={() => setRetItems(retItems.map(i => i.productId === item.productId ? { ...i, shouldRestock: !i.shouldRestock } : i))}
+                      className={`flex-row items-center px-2 py-1 rounded-lg border ${item.shouldRestock ? 'bg-emerald-500/10 border-emerald-500/50' : 'bg-red-500/10 border-red-500/50'}`}
+                    >
+                      <Ionicons name={item.shouldRestock ? "refresh-circle" : "trash-outline"} size={14} color={item.shouldRestock ? "#10b981" : "#ef4444"} />
+                      <Text className={`text-[10px] font-bold ml-1`} style={{ color: item.shouldRestock ? "#10b981" : "#ef4444" }}>
+                         {item.shouldRestock ? 'Masuk Gudang' : 'Buang/Rusak'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View className="flex-row items-center justify-end">
+                    <TouchableOpacity onPress={() => setRetItems(retItems.map(i => i.productId === item.productId ? { ...i, qty: Math.max(0, i.qty - 1) } : i))}><Ionicons name="remove-circle" size={26} color="#ef4444" /></TouchableOpacity>
+                    <TextInput className="text-white font-bold mx-3 w-10 text-center text-lg" keyboardType="numeric" value={String(item.qty)} onChangeText={(v) => { const n = parseInt(v.replace(/[^0-9]/g, '')) || 0; setRetItems(retItems.map(i => i.productId === item.productId ? { ...i, qty: Math.min(i.max, Math.max(0, n)) } : i)); }} />
+                    <TouchableOpacity onPress={() => setRetItems(retItems.map(i => i.productId === item.productId ? { ...i, qty: Math.min(item.max, item.qty + 1) } : i))}><Ionicons name="add-circle" size={26} color="#10b981" /></TouchableOpacity>
                   </View>
                 </View>
            ))}
@@ -231,7 +248,8 @@ export default function OfflineSalesScreen() {
 
   useEffect(() => { store.loadAll(); }, []);
 
-  const data = store.transactions.filter(t => t.type === 'offline' && (tab === 'pesanan' ? t.status !== 'retur' : t.status === 'retur'))
+  const data = store.transactions.filter(t => t.type === 'offline' && t.parentId === null)
+               .filter(t => tab === 'pesanan' ? true : store.transactions.some(child => child.parentId === t.id && child.status === 'retur'))
                .filter(t => (t.customerName || '').toLowerCase().includes(search.toLowerCase()) || String(t.id).includes(search));
 
   return (

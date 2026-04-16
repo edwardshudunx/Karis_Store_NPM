@@ -33,7 +33,10 @@ const commonStyles = `
   .sign-line { margin-top: 50px; border-top: 1px solid #94a3b8; padding-top: 5px; font-weight: bold; }
 `;
 
-export const generateInvoicePDF = async (order: any) => {
+export const generateInvoicePDF = async (order: any, allReturns: any[] = [], mode: 'print' | 'share' = 'print') => {
+  const totalReturn = allReturns.reduce((s, r) => s + r.totalAmount, 0);
+  const netAmount = order.totalAmount - totalReturn;
+
   const itemsHtml = (order.items || []).map((item: any) => `
     <tr>
       <td>${item.productName}</td>
@@ -51,23 +54,59 @@ export const generateInvoicePDF = async (order: any) => {
         <table class="info-table">
           <tr>
             <td><strong>PELANGGAN:</strong> ${order.customerName}<br>${order.customerPhone ? `Telp: ${order.customerPhone}<br>` : ''}${order.customerAddress ? `Alamat: ${order.customerAddress}` : ''}</td>
-            <td style="text-align: right;"><strong>NO:</strong> SP-${String(order.id).padStart(4, '0')}<br><strong>TGL:</strong> ${new Date(order.date).toLocaleDateString('id-ID')}</td>
+            <td style="text-align: right;"><strong>NO:</strong> SP-${String(order.id).padStart(4, '0')}<br><strong>TGL:</strong> ${new Date(order.date).toLocaleDateString('id-ID')}${order.dueDate ? `<br><strong>TEMPO:</strong> ${new Date(order.dueDate).toLocaleDateString('id-ID')}` : ''}</td>
           </tr>
         </table>
         <table class="table">
           <thead><tr><th class="col-name">Barang</th><th class="col-qty">Qty</th><th class="col-price">Harga</th><th class="col-total">Subtotal</th></tr></thead>
           <tbody>${itemsHtml}</tbody>
         </table>
+
+        ${allReturns.length > 0 ? `
+          <div class="section-title" style="color: #ef4444; border-left-color: #ef4444;">Penyesuaian Retur</div>
+          <table class="table">
+            <tbody>
+              ${allReturns.flatMap(r => (r.items || [])).map((item: any) => `
+                <tr style="color: #ef4444;">
+                  <td>${item.productName} (Retur)</td>
+                  <td style="text-align: center;">-${item.quantity}</td>
+                  <td style="text-align: center;">${formatRupiah(item.price)}</td>
+                  <td style="text-align: center;">-${formatRupiah(item.price * item.quantity)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        ` : ''}
+
         <div class="summary-box">
-           <div class="net-row"><span class="net-label">TOTAL PESANAN</span><span class="net-value">${formatRupiah(order.totalAmount)}</span></div>
+           ${allReturns.length > 0 ? `
+              <div class="summary-row"><span class="summary-label">Total Pesanan</span><span class="summary-value">${formatRupiah(order.totalAmount)}</span></div>
+              <div class="summary-row"><span class="summary-label" style="color: #ef4444;">Total Retur (-)</span><span class="summary-value" style="color: #ef4444;">${formatRupiah(totalReturn)}</span></div>
+           ` : ''}
+           <div class="net-row">
+              <span class="net-label">${allReturns.length > 0 ? 'TOTAL AKHIR' : 'TOTAL PESANAN'}</span>
+              <span class="net-value">${formatRupiah(netAmount)}</span>
+           </div>
+           ${allReturns.length > 0 ? `<div style="font-size: 9px; color: #64748b; margin-top: 4px; font-style: italic; text-align: right;">Terbilang: ${terbilang(netAmount)} Rupiah</div>` : ''}
         </div>
       </body>
     </html>
   `;
-  await Print.printAsync({ html });
+  if (mode === 'print') {
+    await Print.printAsync({ html });
+  } else {
+    try {
+       const { uri } = await Print.printToFileAsync({ html });
+       await Sharing.shareAsync(uri, { 
+         UTI: '.pdf', 
+         mimeType: 'application/pdf',
+         dialogTitle: `Bagikan SP-${String(order.id).padStart(4, '0')}` 
+       });
+    } catch (e) { console.error('Sharing Error', e); }
+  }
 };
 
-export const generateSettlementPDF = async (order: any, allReturns: any[]) => {
+export const generateSettlementPDF = async (order: any, allReturns: any[], mode: 'print' | 'share' = 'print') => {
   const totalReturn = allReturns.reduce((s, r) => s + r.totalAmount, 0);
   const netAmount = order.totalAmount - totalReturn;
 
@@ -135,5 +174,16 @@ export const generateSettlementPDF = async (order: any, allReturns: any[]) => {
       </body>
     </html>
   `;
-  await Print.printAsync({ html });
+  if (mode === 'print') {
+    await Print.printAsync({ html });
+  } else {
+    try {
+       const { uri } = await Print.printToFileAsync({ html });
+       await Sharing.shareAsync(uri, { 
+         UTI: '.pdf', 
+         mimeType: 'application/pdf',
+         dialogTitle: `Kwitansi-${String(order.id).padStart(4, '0')}` 
+       });
+    } catch (e) { console.error('Sharing Error', e); }
+  }
 };
